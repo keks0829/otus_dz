@@ -1,0 +1,46 @@
+global:
+  resolve_timeout: 5m
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: 'Telegram_critical'
+  routes:
+    - match:
+        severity: "warning"
+      receiver: 'Telegram_warning'
+#    - match:
+#        severity: "critical"
+#      receiver: 'Telegram_critical'
+
+
+
+
+    - match_re:
+        severity: ^(critical|info)$
+      receiver: Telegram_critical
+
+
+receivers:
+   - name: 'Telegram_critical'
+     telegram_configs:
+       - api_url: 'https://api.telegram.org'
+         bot_token: '7579290301:AAGUdzQXTH85CinjUClJehKOCvZdZM5iAoY'
+         chat_id: -1002346967342
+         parse_mode: HTML
+
+   - name: 'Telegram_warning'
+     telegram_configs:
+       - api_url: 'https://api.telegram.org'
+         bot_token: '7384437565:AAE_a6zK_FMAW13MBjG1fw1vZrfqs4gI1R8'
+         chat_id: -4757107568
+         parse_mode: HTML
+
+
+#inhibit_rules:
+#  - source_match:
+#      severity: 'critical'
+#    target_match:
+#      severity: 'warning'
+#    equal: ['alertname', 'instance']
