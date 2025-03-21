@@ -1,0 +1,59 @@
+sources:
+#  generate_syslog:
+#    type:   "demo_logs"
+#    format: "syslog"
+#    count:  100
+  nginx_logs:
+    type: file
+    include:
+      - "/var/log/nginx/access_json.log"
+    read_from: beginning
+#transforms:
+#  remap_syslog:
+#    inputs:
+#      - "generate_syslog"
+#    type:   "remap"
+#    source: |
+#            structured = parse_syslog!(.message)
+#            . = merge(., structured)
+transforms:
+  parse_json_logs:
+    type: "remap"
+    inputs: ["nginx_logs"]
+    source: |
+      # Преобразуем строку в объект JSON (если вдруг приходит как строка)
+      . = parse_json!(.message)
+
+      # Оставляем только нужные поля
+      {
+        "ip": .remote_addr,
+        "status": .status,
+        "request": .request,
+        "user_agent": .http_user_agent
+      }
+sinks:
+#  emit_syslog:
+#    inputs:
+#      - "remap_syslog"
+#    type: "console"
+#    encoding:
+#      codec: "json"
+  elasticsearch:
+    type: elasticsearch
+    inputs:
+      - nginx_logs
+    endpoint: "https://192.168.56.113:9200"
+    auth:
+      strategy: "basic"
+      user: "elastic"
+      password: "Lbfho3hxob15g30iU*Hs"
+    bulk:
+      action: "create"
+    doc_type: "_doc"
+    tls:
+      verify_certificate: false
+#    encoding:
+#      codec: "json"
+#    index: "test-test"
+#    index:
+#      pattern: ""test-test"s"  # Указание индекса с паттерном
