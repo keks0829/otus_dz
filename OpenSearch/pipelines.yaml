@@ -1,0 +1,13 @@
+entry-pipeline:
+  source:
+    http:
+      authentication:
+        unauthenticated:
+      port: 2021
+  sink:
+    - opensearch:
+        hosts: ["https://192.168.56.113:9200"]
+        username: "admin"
+        password: "Lbfho3hxob15g30iU*Hs"
+        index: "nginx22_logs"
+        insecure: true
