@@ -1,0 +1,94 @@
+# This minimal config scrape only single log file.
+# Primarily used in rpm/deb packaging where promtail service can be started during system init process.
+# And too much scraping during init process can overload the complete system.
+# https://github.com/grafana/loki/issues/11398
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+- url: http://192.168.56.113:3100/loki/api/v1/push
+
+scrape_configs:
+#- job_name: system
+#  static_configs:
+#  - targets:
+#      - localhost
+#    labels:
+#      job: varlogs
+#      #NOTE: Need to be modified to scrape any additional logs of the system.
+#      __path__: /var/log/messages
+- job_name: nginx
+  static_configs:
+  - targets:
+      - 192.168.56.112
+    labels:
+      job: nginx
+      __path__: /var/log/nginx/*log
+  pipeline_stages:
+    - match:
+        selector: '{job="nginx"}'
+        stages:
+        - regex:
+            expression: '^(?P<remote_addr>[\w\.]+) - (?P<remote_user>[^ ]*) \[(?P<time_local>.*)\] "(?P<method>[^ ]*) (?P<request>[^ ]*) (?P<protocol>[^ ]*)" (?P<status>[\d]+) (?P<body_bytes_sent>[\d]+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"?'
+        - labels:
+            remote_addr:
+            remote_user:
+            time_local:
+            method:
+            request:
+            protocol:
+            status:
+            body_bytes_sent:
+            http_referer:
+            http_user_agent:
+- job_name: MySQL
+  static_configs:
+  - targets:
+      - 192.168.56.112
+    labels:
+      job: mysql
+      __path__: /var/log/mysql/query.log
+  pipeline_stages:
+    - match:
+        selector: '{job="mysql"}'
+        stages:
+        - regex:
+            expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\s+(?P<thread_id>\d+)\s+(?P<command>\w+)\s+(?P<query>.+)$'
+        - regex:
+            source: query
+            expression: 'on\s+(?P<db_name>\w+)|Init\s+DB\s+(?P<db_name>\w+)'
+        - regex:
+            source: query
+            expression: '(?P<db_user>\w+)@'
+        - labels:
+            command:  # Тип операции (Query, Connect, Execute и т.д.)
+            db_user:  # Пользователь (добавится ниже)
+            db_name:  # Имя БД (добавится ниже)
+        - timestamp:
+            source: timestamp
+            format: "2006-01-02T15:04:05.999999Z"
+        - output:
+            source: query  # Сохраняем запрос в тело лога
+- job_name: php-fpm
+  static_configs:
+    - targets:
+        - 192.168.56.112
+      labels:
+        job: php-fpm
+        app: php
+        __path__: /var/log/php8.1-fpm.log
+  pipeline_stages:
+    - regex:
+        expression: '^\[(?P<timestamp>\d{2}-\w{3}-\d{4} \d{2}:\d{2}:\d{2})\] (?P<severity>\w+): (?P<message>.+)$'
+    - labels:
+        severity:
+    - timestamp:
+        source: timestamp
+        format: "02-Jan-2006 15:04:05"
+    - output:
+        source: message
